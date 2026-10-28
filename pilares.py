@@ -54,7 +54,6 @@ class Item(Medivel):
 
         self.__pai = destino
 
-    # Por padrão, um item não aceita outros itens dentro dele.
     def _receber(self, item):
         raise ValueError(
             self.__nome + " é um arquivo, não pode conter itens"
@@ -98,7 +97,56 @@ class Arquivo(Item):
         )
 
 
-# PASTA: pode conter arquivos e outras pastas.
+# ATALHO: aponta para outro item sem copiar seu conteúdo.
+class Atalho(Item):
+    __slots__ = ("__destino",)
+
+    def __init__(self, nome, destino, pai=None):
+        self.__destino = None
+        super().__init__(nome, pai)
+
+        try:
+            self.redirecionar(destino)
+        except Exception:
+            # Evita deixar um atalho inválido dentro da pasta.
+            if self.pai is not None:
+                self.pai._soltar(self)
+                self._Item__pai = None
+            raise
+
+    @property
+    def destino(self):
+        return self.__destino
+
+    def redirecionar(self, novo_destino):
+        if not isinstance(novo_destino, Item):
+            raise ValueError("o destino deve ser um Item")
+
+        if novo_destino is self:
+            raise ValueError("um atalho não pode apontar para si mesmo")
+
+        ancestral = self.pai
+
+        while ancestral is not None:
+            if ancestral is novo_destino:
+                raise ValueError(
+                    "o destino não pode ser uma pasta ancestral do atalho"
+                )
+            ancestral = ancestral.pai
+
+        self.__destino = novo_destino
+
+    def tamanho(self):
+        return 1
+
+    def mostrar(self):
+        recuo = "    " * self.profundidade()
+        print(
+            recuo + self.nome + " -> " + self.destino.caminho()
+        )
+
+
+# PASTA: pode conter arquivos, atalhos e outras pastas.
 class Pasta(Item):
     __slots__ = ("__filhos",)
 
@@ -110,7 +158,6 @@ class Pasta(Item):
     def filhos(self):
         return tuple(self.__filhos)
 
-    # A pasta aceita itens, mas impede ciclos na árvore.
     def _receber(self, item):
         ancestral = self
 
@@ -129,7 +176,6 @@ class Pasta(Item):
     def _soltar(self, item):
         self.__filhos.remove(item)
 
-    # Polimorfismo: soma o tamanho de todos os itens da pasta.
     def tamanho(self):
         total = 0
 
@@ -150,7 +196,7 @@ class Pasta(Item):
             filho.mostrar()
 
 
-# LIXEIRA: mede os arquivos descartados sem pertencer à árvore.
+# LIXEIRA: mede os arquivos descartados.
 class Lixeira(Medivel):
     __slots__ = ("__descartados",)
 
